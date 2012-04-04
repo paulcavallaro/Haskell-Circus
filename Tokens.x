@@ -123,11 +123,11 @@ alexInitUserState = AlexUserState {
 alexEOF = return EOF
 
 scanner str = runAlex str $ do
-  let loop i = do tok <- alexMonadScan; 
-               	  if tok == EOF
-	       	     	then return i
-			else do let i' = i+1 in i' `seq` loop i'
-  loop 0
+  let loop toks = do tok <- alexMonadScan
+               	     if tok == EOF
+                     then return toks
+                     else let foo = loop (tok : toks) in foo
+  loop []
 
 main = do
      s <- getContents
