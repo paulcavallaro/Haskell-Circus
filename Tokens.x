@@ -1,7 +1,7 @@
 {
     module Main(main) where
 }
-%wrapper "basic"
+%wrapper "monadUserState"
 
 $digit = 0-9
 $alpha = [a-zA-Z]
@@ -66,36 +66,70 @@ $bindigit = [0 1]
 
 tokens :-
 
-    $white+                                                     ;
-    \#.*                                                        ;
-    @operator                                                   { \s -> Punct (head s) }
-    @delimiter                                                  { \s -> Punct (head s) }
-    @keyword                                                    { \s -> Keyword s }
-    [$alpha \_][$alpha $digit \_]*                              { \s -> Id s }
-    @integerliteral                                             { \s -> Lit s }
-    @floatliteral                                               { \s -> Lit s }
-    @rawlongstringliteral                                       { \s -> Lit $ drop 4 $ reverse $ drop 3 $ reverse s }
-    @longstringliteral                                          { \s -> Lit $ drop 3 $ reverse $ drop 3 $ reverse s }
-    @rawshortstringliteral                                      { \s -> Lit $ drop 2 $ init s }
-    @shortstringliteral                                         { \s -> Lit $ tail $ init s }
-    @bytesliteralshort                                          { \s -> Lit $ drop 2 $ init s }
-    @bytesliterallong                                           { \s -> Lit $ drop 4 $ reverse $ drop 3 $ reverse s }
-    @imagliteral                                                { \s -> Lit s }
-{
+    $white+                                                     { skip }
+    \#.*                                                        { skip }
+    @operator                                                   { punct }
+    @delimiter                                                  { punct }
+    @keyword                                                    { keyword }
+    [$alpha \_][$alpha $digit \_]*                              { idToken }
+    @integerliteral                                             { intLit }
+    @floatliteral                                               { floatLit }
+    @rawlongstringliteral                                       { rawLongStringLit }
+    @longstringliteral                                          { longStringLit }
+    @rawshortstringliteral                                      { rawShortStringLit }
+    @shortstringliteral                                         { shortStringLit }
+    @bytesliteralshort                                          { bytesShortLit }
+    @bytesliterallong                                           { bytesLongLit }
+    @imagliteral                                                { imagLit }
 
--- Each action has type :: String -> Token
+
+{
 
 -- The token type:
 
 data Token =
-     Return                     |
-     Punct Char                 |
-     Id String                  |
-     Lit String                 |
-     Keyword String
+       Return
+     | EOF
+     | Punct Char
+     | Id String
+     | Lit String
+     | Keyword String
      deriving (Eq,Show)
+
+punct (_,_,input) _ = return $ Punct (head input)
+keyword (_,_,input) len = return $ Keyword (take len input)
+idToken (_,_,input) len = return $ Id (take len input)
+intLit (_,_,input) len = return $ Lit (take len input)
+floatLit (_,_,input) len = return $ Lit (take len input)
+rawLongStringLit (_,_,input) len = return $ Lit $ drop 4 $ reverse $ drop 3 $ reverse (take len input)
+longStringLit (_,_,input) len = return $ Lit $ drop 3 $ reverse $ drop 3 $ reverse (take len input)
+rawShortStringLit (_,_,input) len = return $ Lit $ drop 2 $ init (take len input)
+shortStringLit (_,_,input) len = return $ Lit $ tail $ init (take len input)
+bytesShortLit (_,_,input) len = return $ Lit $ drop 2 $ init (take len input)
+bytesLongLit (_,_,input) len = return $ Lit $ drop 4 $ reverse $ drop 3 $ reverse (take len input)
+imagLit (_,_,input) len = return $ Lit (take len input)
+
+
+
+data AlexUserState = AlexUserState {
+     lexerIndentDepth :: [Int]
+}
+
+alexInitUserState :: AlexUserState
+alexInitUserState = AlexUserState {
+                        lexerIndentDepth = [0]
+                    }
+
+alexEOF = return EOF
+
+scanner str = runAlex str $ do
+  let loop i = do tok <- alexMonadScan; 
+               	  if tok == EOF
+	       	     	then return i
+			else do let i' = i+1 in i' `seq` loop i'
+  loop 0
 
 main = do
      s <- getContents
-     print (alexScanTokens s)
+     print (scanner s)
 }
