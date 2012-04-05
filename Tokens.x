@@ -64,9 +64,13 @@ $bindigit = [0 1]
              \+\= | \-\= | \*\= | \/\= | \/\/\= | \%\= | \&\= | \!\= | \^\= |
              \>\>\= | \<\<\= | \*\*\=
 
+$spacetab = [\t \ ]
+
 tokens :-
 
-    $white+                                                     { skip }
+    \n                                                          { newline }
+    ^$spacetab+                                                 { indent }
+    $spacetab+                                                  { skip }
     \#.*                                                        { skip }
     @operator                                                   { punct }
     @delimiter                                                  { punct }
@@ -89,6 +93,9 @@ tokens :-
 
 data Token =
        Return
+     | Indent
+     | Dedent
+     | Newline
      | EOF
      | Punct Char
      | Id String
@@ -96,6 +103,8 @@ data Token =
      | Keyword String
      deriving (Eq,Show)
 
+indent (_,_,input) len = return $ Indent
+newline (_,_,_) _ = return $ Newline
 punct (_,_,input) _ = return $ Punct (head input)
 keyword (_,_,input) len = return $ Keyword (take len input)
 idToken (_,_,input) len = return $ Id (take len input)
@@ -108,7 +117,6 @@ shortStringLit (_,_,input) len = return $ Lit $ tail $ init (take len input)
 bytesShortLit (_,_,input) len = return $ Lit $ drop 2 $ init (take len input)
 bytesLongLit (_,_,input) len = return $ Lit $ drop 4 $ reverse $ drop 3 $ reverse (take len input)
 imagLit (_,_,input) len = return $ Lit (take len input)
-
 
 
 data AlexUserState = AlexUserState {
@@ -124,9 +132,9 @@ alexEOF = return EOF
 
 scanner str = runAlex str $ do
   let loop toks = do tok <- alexMonadScan
-               	     if tok == EOF
-                     then return toks
-                     else let foo = loop (tok : toks) in foo
+                     case tok of
+                          EOF -> return (reverse toks)
+                          _ -> let foo = loop (tok : toks) in foo
   loop []
 
 main = do
