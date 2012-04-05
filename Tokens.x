@@ -68,6 +68,7 @@ $spacetab = [\t \ ]
 
 tokens :-
 
+    ^\n                                                         { indent }
     \n                                                          { newline }
     ^$spacetab+                                                 { indent }
     $spacetab+                                                  { skip }
@@ -93,6 +94,7 @@ tokens :-
 
 data Token =
        Return
+     | NoOp
      | Indent
      | Dedent
      | Newline
@@ -103,7 +105,23 @@ data Token =
      | Keyword String
      deriving (Eq,Show)
 
-indent (_,_,input) len = return $ Indent
+alexGetUserState :: Alex AlexUserState
+alexGetUserState = Alex $ \s@AlexState{alex_ust=ust} -> Right (s, ust)
+
+alexSetUserState :: AlexUserState -> Alex ()
+alexSetUserState ust = Alex $ \s -> Right (s{alex_ust=ust}, ())
+
+indent :: AlexInput -> Int -> Alex Token
+indent (_,_,input) len = do
+       ust@AlexUserState{lexerIndentDepth=indentStack} <- alexGetUserState
+       if len == (head indentStack)
+       then return $ NoOp
+       else if len < (head indentStack)
+       then do alexSetUserState ust{lexerIndentDepth=(tail indentStack)}
+               return $ Dedent
+       else do alexSetUserState ust{lexerIndentDepth=(len : indentStack)}
+               return $ Indent
+
 newline (_,_,_) _ = return $ Newline
 punct (_,_,input) _ = return $ Punct (head input)
 keyword (_,_,input) len = return $ Keyword (take len input)
@@ -130,6 +148,7 @@ alexInitUserState = AlexUserState {
 
 alexEOF = return EOF
 
+scanner :: String -> Either String [Token]
 scanner str = runAlex str $ do
   let loop toks = do tok <- alexMonadScan
                      case tok of
