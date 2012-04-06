@@ -94,7 +94,6 @@ tokens :-
 
 data Token =
        Return
-     | NoOp
      | Indent
      | Dedent
      | Newline
@@ -111,30 +110,35 @@ alexGetUserState = Alex $ \s@AlexState{alex_ust=ust} -> Right (s, ust)
 alexSetUserState :: AlexUserState -> Alex ()
 alexSetUserState ust = Alex $ \s -> Right (s{alex_ust=ust}, ())
 
-indent :: AlexInput -> Int -> Alex Token
+indent :: AlexInput -> Int -> Alex [Token]
 indent (_,_,input) len = do
        ust@AlexUserState{lexerIndentDepth=indentStack} <- alexGetUserState
-       if len == (head indentStack)
-       then return $ NoOp
-       else if len < (head indentStack)
-       then do alexSetUserState ust{lexerIndentDepth=(tail indentStack)}
-               return $ Dedent
-       else do alexSetUserState ust{lexerIndentDepth=(len : indentStack)}
-               return $ Indent
+       let (newStack, tokens) = popIndentStack len indentStack []
+       alexSetUserState ust{lexerIndentDepth=newStack}
+       return tokens
 
-newline (_,_,_) _ = return $ Newline
-punct (_,_,input) _ = return $ Punct (head input)
-keyword (_,_,input) len = return $ Keyword (take len input)
-idToken (_,_,input) len = return $ Id (take len input)
-intLit (_,_,input) len = return $ Lit (take len input)
-floatLit (_,_,input) len = return $ Lit (take len input)
-rawLongStringLit (_,_,input) len = return $ Lit $ drop 4 $ reverse $ drop 3 $ reverse (take len input)
-longStringLit (_,_,input) len = return $ Lit $ drop 3 $ reverse $ drop 3 $ reverse (take len input)
-rawShortStringLit (_,_,input) len = return $ Lit $ drop 2 $ init (take len input)
-shortStringLit (_,_,input) len = return $ Lit $ tail $ init (take len input)
-bytesShortLit (_,_,input) len = return $ Lit $ drop 2 $ init (take len input)
-bytesLongLit (_,_,input) len = return $ Lit $ drop 4 $ reverse $ drop 3 $ reverse (take len input)
-imagLit (_,_,input) len = return $ Lit (take len input)
+popIndentStack :: Int -> [Int] -> [Token] -> ([Int], [Token])
+popIndentStack len indentStack accum =
+               if len == (head indentStack)
+               then (indentStack, accum)
+               else if len < (head indentStack)
+               then popIndentStack len (tail indentStack) (Dedent : accum)
+               else ((len : indentStack), (Indent : accum))
+
+
+newline (_,_,_) _ = return $ [Newline]
+punct (_,_,input) _ = return $ [Punct (head input)]
+keyword (_,_,input) len = return $ [Keyword (take len input)]
+idToken (_,_,input) len = return $ [Id (take len input)]
+intLit (_,_,input) len = return $ [Lit (take len input)]
+floatLit (_,_,input) len = return $ [Lit (take len input)]
+rawLongStringLit (_,_,input) len = return $ [Lit $ drop 4 $ reverse $ drop 3 $ reverse (take len input)]
+longStringLit (_,_,input) len = return $ [Lit $ drop 3 $ reverse $ drop 3 $ reverse (take len input)]
+rawShortStringLit (_,_,input) len = return $ [Lit $ drop 2 $ init (take len input)]
+shortStringLit (_,_,input) len = return $ [Lit $ tail $ init (take len input)]
+bytesShortLit (_,_,input) len = return $ [Lit $ drop 2 $ init (take len input)]
+bytesLongLit (_,_,input) len = return $ [Lit $ drop 4 $ reverse $ drop 3 $ reverse (take len input)]
+imagLit (_,_,input) len = return $ [Lit (take len input)]
 
 
 data AlexUserState = AlexUserState {
@@ -146,20 +150,24 @@ alexInitUserState = AlexUserState {
                         lexerIndentDepth = [0]
                     }
 
-alexEOF = return EOF
+alexEOF = return [EOF]
 
 scanner :: String -> Either String [Token]
 scanner str = runAlex str $ do
   let loop toks = do tok <- alexMonadScan
                      case tok of
-                          EOF -> return (reverse toks)
-                          _ -> let foo = loop (tok : toks) in foo
+                          [EOF] -> return (reverse toks)
+                          _ -> let foo = loop (tok ++ toks) in foo
   loop []
 
 printToken :: Token -> IO ()
 printToken token = do
      case token of
           Newline -> putStrLn ""
+          Punct c -> putStr $ c : " "
+          Id s -> putStr (s ++ " ")
+          Keyword s -> putStr (s ++ " ")
+          Lit s -> putStr (s ++ " ")
           _ -> putStr $ (show token) ++ " "
 
 
