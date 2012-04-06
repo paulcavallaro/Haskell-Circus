@@ -156,7 +156,16 @@ scanner str = runAlex str $ do
                           _ -> let foo = loop (tok : toks) in foo
   loop []
 
+printToken :: Token -> IO ()
+printToken token = do
+     case token of
+          Newline -> putStrLn ""
+          _ -> putStr $ (show token) ++ " "
+
+
 main = do
      s <- getContents
-     print (scanner s)
+     case (scanner s) of
+          Left message -> print message
+          Right tokens -> mapM_ printToken tokens
 }
