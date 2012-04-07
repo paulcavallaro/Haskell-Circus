@@ -33,6 +33,8 @@ $shortbytescharsingle = [^ \\ \n \' ]
 @bytesprefix = (b | B | br | Br | bR | BR)
 @bytesliteralshort = @bytesprefix @shortbytes
 @bytesliterallong = @bytesprefix @longbytes
+$backslash = [\\]
+@linecontinuation = $backslash \n
 
 $nonzerodigit = [1-9]
 $octdigit = [0-7]
@@ -72,6 +74,8 @@ tokens :-
     \n                                                          { newline }
     ^$spacetab+                                                 { indent }
     $spacetab+                                                  { skip }
+    @linecontinuation                                           { skip }
+    $backslash                                                  { backslash }
     \#.*                                                        { skip }
     @operator                                                   { punct }
     @delimiter                                                  { punct }
@@ -94,6 +98,7 @@ tokens :-
 
 data Token =
        Return
+     | BackSlash
      | Indent
      | Dedent
      | Newline
@@ -126,6 +131,7 @@ popIndentStack len indentStack accum =
                else ((len : indentStack), (Indent : accum))
 
 
+backslash (_,_,_) _ = return $ [BackSlash]
 newline (_,_,_) _ = return $ [Newline]
 punct (_,_,input) _ = return $ [Punct (head input)]
 keyword (_,_,input) len = return $ [Keyword (take len input)]
