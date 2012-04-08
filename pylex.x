@@ -83,6 +83,8 @@ tokens :-
        <0>                              @keyword                                                { keyword }
        <0>                              @punctuation                                            { punct }
        <0>                              @linecontinuation                                       { skip }
+       <0>                              ^$white*\n                                              { skip }
+       <0>                              ^$white*\#.*\n                                          { skip }
        <shortString>                    \"                                                      { endStringLit 0 (\s -> subRegex (mkRegex "\\\\\"") s "\"") }
        <shortString>                    @shortstringitemdouble                                  { stringLit }
        <shortString'>                   \'                                                      { endStringLit 0 (\s -> subRegex (mkRegex "\\\\'") s "'") }
@@ -93,7 +95,7 @@ tokens :-
        <longString>                     \"\"\"                                                  { endStringLit 0 id }
        <longString'>                    \'\'\'                                                  { endStringLit 0 id }
        <0>                              .                                                       { skip }
-       <0>                              \n                                                      { skip }
+       <0>                              \n                                                      { newline }
 
 {
 
@@ -202,5 +204,5 @@ main = do
      s <- getContents
      case (scanner s) of
           Left message -> print message
-          Right tokens -> mapM_ print tokens
+          Right tokens -> print tokens
 }
