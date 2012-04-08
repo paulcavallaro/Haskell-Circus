@@ -44,6 +44,7 @@ $bindigit = [0 1]
 @bininteger = 0 (b | B) $bindigit+
 @decimalinteger = $nonzerodigit $digit* | 0+
 @integerliteral = @decimalinteger | @octinteger | @hexinteger | @bininteger
+@longinteger = @integerliteral (l | L)
 
 @intpart = $digit+
 @fraction =  \. $digit+
@@ -85,6 +86,10 @@ tokens :-
        <0>                              @linecontinuation                                       { skip }
        <0>                              ^$white*\n                                              { skip }
        <0>                              ^$white*\#.*\n                                          { skip }
+       <0>                              @integerliteral                                         { literal }
+       <0>                              @imagliteral                                            { literal }
+       <0>                              @floatliteral                                           { literal }
+       <0>                              @longinteger                                            { literal }
        <shortString>                    \"                                                      { endStringLit 0 (\s -> subRegex (mkRegex "\\\\\"") s "\"") }
        <shortString>                    @shortstringitemdouble                                  { stringLit }
        <shortString'>                   \'                                                      { endStringLit 0 (\s -> subRegex (mkRegex "\\\\'") s "'") }
@@ -137,11 +142,7 @@ newline (_,_,_) _ = return $ [Newline]
 
 
 
-intLit (_,_,input) len = return $ [Lit (take len input)]
-floatLit (_,_,input) len = return $ [Lit (take len input)]
-rawLongStringLit (_,_,input) len = return $ [Lit $ drop 4 $ reverse $ drop 3 $ reverse (take len input)]
-longStringLit (_,_,input) len = return $ [Lit $ drop 3 $ reverse $ drop 3 $ reverse (take len input)]
-rawShortStringLit (_,_,input) len = return $ [Lit $ drop 2 $ init (take len input)]
+literal (_,_,input) len = return $ [Lit (take len input)]
 
 identifier (_,_,input) len = return [Id (take len input)]
 
