@@ -34,8 +34,6 @@ $shortbytescharsingle = [^ \\ \n \' ]
 @bytesprefix = (b | B | br | Br | bR | BR)
 @bytesliteralshort = @bytesprefix @shortbytes
 @bytesliterallong = @bytesprefix @longbytes
-$backslash = [\\]
-@linecontinuation = $backslash \n
 
 $nonzerodigit = [1-9]
 $octdigit = [0-7]
@@ -60,12 +58,18 @@ $bindigit = [0 1]
            del|elif|else|except|finally|for|from|global|if|import|in|is|lambda|
            nonlocal|not|or|pass|raise|return|try|while|with|yield
 
+@identifier = ($alpha|_) ($alpha | $digit | _)*
+
 @operator = \+ | \- | \* | \*\* | \/ | \/\/ | \% | \<\< | \>\> | \& |
             \| | \^ | \~ | \< | \> | \<\= | \>\= | \=\= | \!\=
 
 @delimiter = \( | \) | \[ | \] | \{ | \} | \, | \: | \. | \; | \@ | \= |
              \+\= | \-\= | \*\= | \/\= | \/\/\= | \%\= | \&\= | \!\= | \^\= |
              \>\>\= | \<\<\= | \*\*\=
+
+@punctuation = (@operator | @delimiter)
+
+@linecontinuation = \\ \n
 
 $spacetab = [\t \ ]
 
@@ -75,6 +79,10 @@ tokens :-
        <0>                              \'                                                      { begin shortString' }
        <0>                              \"\"\"                                                  { begin longString }
        <0>                              \'\'\'                                                  { begin longString' }
+       <0>                              @identifier                                             { identifier }
+       <0>                              @keyword                                                { keyword }
+       <0>                              @punctuation                                            { punct }
+       <0>                              @linecontinuation                                       { skip }
        <shortString>                    \"                                                      { endStringLit 0 (\s -> subRegex (mkRegex "\\\\\"") s "\"") }
        <shortString>                    @shortstringitemdouble                                  { stringLit }
        <shortString'>                   \'                                                      { endStringLit 0 (\s -> subRegex (mkRegex "\\\\'") s "'") }
@@ -124,14 +132,21 @@ popIndentStack len indentStack accum =
 
 
 newline (_,_,_) _ = return $ [Newline]
-punct (_,_,input) _ = return $ [Punct (head input)]
-keyword (_,_,input) len = return $ [Keyword (take len input)]
-idToken (_,_,input) len = return $ [Id (take len input)]
+
+
+
 intLit (_,_,input) len = return $ [Lit (take len input)]
 floatLit (_,_,input) len = return $ [Lit (take len input)]
 rawLongStringLit (_,_,input) len = return $ [Lit $ drop 4 $ reverse $ drop 3 $ reverse (take len input)]
 longStringLit (_,_,input) len = return $ [Lit $ drop 3 $ reverse $ drop 3 $ reverse (take len input)]
 rawShortStringLit (_,_,input) len = return $ [Lit $ drop 2 $ init (take len input)]
+
+identifier (_,_,input) len = return [Id (take len input)]
+
+keyword :: (AlexPosn, Char, String) -> Int -> Alex [Token]
+keyword (_,_,input) len = return [Keyword (take len input)]
+
+punct (_,_,input) _ = return [Punct (head input)]
 
 stringLit :: (AlexPosn, Char, String) -> Int -> Alex [Token]
 stringLit (_,_,input) len = do
