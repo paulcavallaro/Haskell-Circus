@@ -6,7 +6,7 @@
 $digit = 0-9
 $alpha = [a-zA-Z]
 
-$longstringchar = [^ \\]
+$longstringchar = [.\n]
 @stringescapeseq = \\.
 $shortstringcharsingle = [^ \\ \n ']
 $shortstringchardouble = [^ \\ \n \"]
@@ -70,27 +70,19 @@ $spacetab = [\t \ ]
 
 tokens :-
 
-    ^\n                                                         { indent }
-    \n                                                          { newline }
-    ^$spacetab+                                                 { indent }
-    $spacetab+                                                  { skip }
-    @linecontinuation                                           { skip }
-    $backslash                                                  { backslash }
-    \#.*                                                        { skip }
-    @operator                                                   { punct }
-    @delimiter                                                  { punct }
-    @keyword                                                    { keyword }
-    [$alpha \_][$alpha $digit \_]*                              { idToken }
-    @integerliteral                                             { intLit }
-    @floatliteral                                               { floatLit }
-    @rawlongstringliteral                                       { rawLongStringLit }
-    @longstringliteral                                          { longStringLit }
-    @rawshortstringliteral                                      { rawShortStringLit }
-    @shortstringliteral                                         { shortStringLit }
-    @bytesliteralshort                                          { bytesShortLit }
-    @bytesliterallong                                           { bytesLongLit }
-    @imagliteral                                                { imagLit }
-
+       <0>                              \"                                                      { begin shortString }
+       <0>                              \'                                                      { begin shortString' }
+       <0>                              \"\"\"                                                  { begin longString }
+       <0>                              \'\'\'                                                  { begin longString' }
+       <shortString>                    \"                                                      { endStringLit 0 id }
+       <shortString>                    @shortstringitemdouble                                  { stringLit }
+       <shortString'>                   \'                                                      { endStringLit 0 id }
+       <shortString'>                   @shortstringitemsingle                                  { stringLit }
+       <longString,longString'>         @longstringitem                                         { stringLit }
+       <longString>                     \"\"\"                                                  { endStringLit 0 id }
+       <longString'>                    \'\'\'                                                  { endStringLit 0 id }
+       <0>                              .                                                       { skip }
+       <0>                              \n                                                      { skip }
 
 {
 
@@ -115,7 +107,6 @@ alexGetUserState = Alex $ \s@AlexState{alex_ust=ust} -> Right (s, ust)
 alexSetUserState :: AlexUserState -> Alex ()
 alexSetUserState ust = Alex $ \s -> Right (s{alex_ust=ust}, ())
 
-indent :: AlexInput -> Int -> Alex [Token]
 indent (_,_,input) len = do
        ust@AlexUserState{lexerIndentDepth=indentStack} <- alexGetUserState
        let (newStack, tokens) = popIndentStack len indentStack []
@@ -141,19 +132,33 @@ floatLit (_,_,input) len = return $ [Lit (take len input)]
 rawLongStringLit (_,_,input) len = return $ [Lit $ drop 4 $ reverse $ drop 3 $ reverse (take len input)]
 longStringLit (_,_,input) len = return $ [Lit $ drop 3 $ reverse $ drop 3 $ reverse (take len input)]
 rawShortStringLit (_,_,input) len = return $ [Lit $ drop 2 $ init (take len input)]
-shortStringLit (_,_,input) len = return $ [Lit $ tail $ init (take len input)]
+
+stringLit :: (AlexPosn, Char, String) -> Int -> Alex [Token]
+stringLit (_,_,input) len = do
+          ust@AlexUserState{lazyInput=accum} <- alexGetUserState
+          alexSetUserState ust{lazyInput=(accum ++ (take len input))}
+          return []
+
+endStringLit code transform (_,_,input) len = do
+             ust@AlexUserState{lazyInput=accum} <- alexGetUserState
+             alexSetUserState ust{lazyInput=""}
+             alexSetStartCode code
+             return [Lit (transform accum)]
+
+
 bytesShortLit (_,_,input) len = return $ [Lit $ drop 2 $ init (take len input)]
 bytesLongLit (_,_,input) len = return $ [Lit $ drop 4 $ reverse $ drop 3 $ reverse (take len input)]
 imagLit (_,_,input) len = return $ [Lit (take len input)]
 
-
 data AlexUserState = AlexUserState {
-     lexerIndentDepth :: [Int]
+     lexerIndentDepth :: [Int],
+     lazyInput :: String
 }
 
 alexInitUserState :: AlexUserState
 alexInitUserState = AlexUserState {
-                        lexerIndentDepth = [0]
+                        lexerIndentDepth = [0],
+                        lazyInput = []
                     }
 
 alexEOF = return [EOF]
@@ -181,5 +186,5 @@ main = do
      s <- getContents
      case (scanner s) of
           Left message -> print message
-          Right tokens -> mapM_ printToken tokens
+          Right tokens -> mapM_ print tokens
 }
