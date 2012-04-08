@@ -92,12 +92,10 @@ tokens :-
 -- The token type:
 
 data Token =
-       Return
-     | BackSlash
-     | Indent
+       Indent
      | Dedent
      | Newline
-     | EOF
+     | EndMarker
      | Punct Char
      | Id String
      | Lit String
@@ -125,7 +123,6 @@ popIndentStack len indentStack accum =
                else ((len : indentStack), (Indent : accum))
 
 
-backslash (_,_,_) _ = return $ [BackSlash]
 newline (_,_,_) _ = return $ [Newline]
 punct (_,_,input) _ = return $ [Punct (head input)]
 keyword (_,_,input) len = return $ [Keyword (take len input)]
@@ -155,22 +152,24 @@ imagLit (_,_,input) len = return $ [Lit (take len input)]
 
 data AlexUserState = AlexUserState {
      lexerIndentDepth :: [Int],
-     lazyInput :: String
+     lazyInput :: String,
+     stateCodeStack :: [Int]
 }
 
 alexInitUserState :: AlexUserState
 alexInitUserState = AlexUserState {
                         lexerIndentDepth = [0],
-                        lazyInput = []
+                        lazyInput = [],
+                        stateCodeStack = [0]
                     }
 
-alexEOF = return [EOF]
+alexEOF = return [EndMarker]
 
 scanner :: String -> Either String [Token]
 scanner str = runAlex str $ do
   let loop toks = do tok <- alexMonadScan
                      case tok of
-                          [EOF] -> return (reverse toks)
+                          [EndMarker] -> return (reverse toks)
                           _ -> let foo = loop (tok ++ toks) in foo
   loop []
 
