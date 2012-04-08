@@ -78,6 +78,8 @@ tokens :-
        <shortString>                    @shortstringitemdouble                                  { stringLit }
        <shortString'>                   \'                                                      { endStringLit 0 id }
        <shortString'>                   @shortstringitemsingle                                  { stringLit }
+       <shortString,shortString'>       \\\n                                                    { skip }
+       <longString,longString'>         \\\n                                                    { skip }
        <longString,longString'>         @longstringitem                                         { stringLit }
        <longString>                     \"\"\"                                                  { endStringLit 0 id }
        <longString'>                    \'\'\'                                                  { endStringLit 0 id }

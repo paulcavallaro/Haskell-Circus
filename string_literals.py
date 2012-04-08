@@ -19,3 +19,23 @@
 
 """He said, "Hello there.\""""
 '''""Som""ething'''
+
+"foo     \
+bar"
+
+'foo     \
+bar'
+
+'''line continuation     \
+bam'''
+
+"""line continuation     \
+bam"""
+
+'''
+newlines
+'''
+
+"""
+newlines
+"""
