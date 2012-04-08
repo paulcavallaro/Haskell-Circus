@@ -1,5 +1,6 @@
 {
-    module Main(main) where
+module Main(main) where
+import Text.Regex (subRegex, mkRegex)
 }
 %wrapper "monadUserState"
 
@@ -74,9 +75,9 @@ tokens :-
        <0>                              \'                                                      { begin shortString' }
        <0>                              \"\"\"                                                  { begin longString }
        <0>                              \'\'\'                                                  { begin longString' }
-       <shortString>                    \"                                                      { endStringLit 0 id }
+       <shortString>                    \"                                                      { endStringLit 0 (\s -> subRegex (mkRegex "\\\\\"") s "\"") }
        <shortString>                    @shortstringitemdouble                                  { stringLit }
-       <shortString'>                   \'                                                      { endStringLit 0 id }
+       <shortString'>                   \'                                                      { endStringLit 0 (\s -> subRegex (mkRegex "\\\\'") s "'") }
        <shortString'>                   @shortstringitemsingle                                  { stringLit }
        <shortString,shortString'>       \\\n                                                    { skip }
        <longString,longString'>         \\\n                                                    { skip }
@@ -182,7 +183,6 @@ printToken token = do
           Keyword s -> putStr (s ++ " ")
           Lit s -> putStr (s ++ " ")
           _ -> putStr $ (show token) ++ " "
-
 
 main = do
      s <- getContents
