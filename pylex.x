@@ -77,6 +77,7 @@ $spacetab = [\t \ ]
 
 tokens :-
 
+                                        @linecontinuation                                       { skip }
        <0>                              \"                                                      { begin shortString }
        <0>                              \'                                                      { begin shortString' }
        <0>                              \"\"\"                                                  { begin longString }
@@ -84,24 +85,21 @@ tokens :-
        <0>                              @keyword                                                { keyword }
        <0>                              @identifier                                             { identifier }
        <0>                              @punctuation                                            { punct }
-       <0>                              @linecontinuation                                       { skip }
        <0>                              ^$white*\n                                              { skip }
        <0>                              ^$white*\#.*\n                                          { skip }
        <0>                              @decimalinteger                                         { intLiteral }
-       <0>                              @imagliteral                                            { stringLiteral }
+       <0>                              @imagliteral                                            { imagLiteral }
        <0>                              @floatliteral                                           { stringLiteral }
        <0>                              @longinteger                                            { stringLiteral }
        <shortString>                    \"                                                      { endStringLit 0 id }
        <shortString>                    @shortstringitemdouble                                  { stringLit }
        <shortString'>                   \'                                                      { endStringLit 0 id }
        <shortString'>                   @shortstringitemsingle                                  { stringLit }
-       <shortString,shortString'>       \\\n                                                    { skip }
-       <longString,longString'>         \\\n                                                    { skip }
        <longString,longString'>         @longstringitem                                         { stringLit }
        <longString>                     \"\"\"                                                  { endStringLit 0 id }
        <longString'>                    \'\'\'                                                  { endStringLit 0 id }
-       <0>                              .                                                       { skip }
        <0>                              \n                                                      { newline }
+       <0>                              .                                                       { skip }
 
 {
 
@@ -116,6 +114,7 @@ data Token =
      | Id String
      | StringLit String
      | IntLit Integer
+     | ImagLit String
      | Keyword String
      | NoOp
      deriving (Eq)
@@ -126,6 +125,7 @@ showToken (Punct str) = "(PUNCT \"" ++ str ++ "\")"
 showToken (Id str) = "(ID \"" ++ str ++ "\")"
 showToken (StringLit str) = "(LIT \"" ++ str ++ "\")"
 showToken (IntLit int) = "(LIT " ++ (show int) ++ ")"
+showToken (ImagLit str) = "(LIT +" ++ str ++ "i)"
 showToken (Keyword str) = "(KEYWORD " ++ str ++ ")"
 showToken Indent = "(INDENT)"
 showToken Dedent = "(DEDENT)"
@@ -141,9 +141,9 @@ alexSetUserState ust = Alex $ \s -> Right (s{alex_ust=ust}, ())
 
 indent (_,_,input) len = do
        ust@AlexUserState{lexerIndentDepth=indentStack} <- alexGetUserState
-       let (newStack, tokens) = popIndentStack len indentStack []
+       let (newStack, tokens) = popIndentStack (len - 1) indentStack []
        alexSetUserState ust{lexerIndentDepth=newStack}
-       return tokens
+       return (Newline : tokens)
 
 popIndentStack :: Int -> [Int] -> [Token] -> ([Int], [Token])
 popIndentStack len indentStack accum =
@@ -158,6 +158,8 @@ newline (_,_,_) _ = return $ [Newline]
 stringLiteral (_,_,input) len = return $ [StringLit (take len input)]
 
 intLiteral (_,_,input) len = return $ [IntLit (read (take len input))]
+
+imagLiteral (_,_,input) len = return $ [ImagLit (take (len -1) input)]
 
 identifier (_,_,input) len = return [Id (take len input)]
 
