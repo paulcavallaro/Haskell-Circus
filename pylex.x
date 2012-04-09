@@ -1,6 +1,7 @@
 {
 module Main(main) where
 import Text.Regex (subRegex, mkRegex)
+import Data.List (mapAccumL)
 }
 %wrapper "monadUserState"
 
@@ -116,6 +117,8 @@ data Token =
      | StringLit String
      | IntLit Integer
      | Keyword String
+     | NoOp
+     deriving (Eq)
 
 showToken :: Token -> String
 showToken EndMarker = "(ENDMARKER)"
@@ -150,10 +153,7 @@ popIndentStack len indentStack accum =
                then popIndentStack len (tail indentStack) (Dedent : accum)
                else ((len : indentStack), (Indent : accum))
 
-
 newline (_,_,_) _ = return $ [Newline]
-
-
 
 stringLiteral (_,_,input) len = return $ [StringLit (take len input)]
 
@@ -180,15 +180,13 @@ endStringLit code transform (_,_,input) len = do
 
 data AlexUserState = AlexUserState {
      lexerIndentDepth :: [Int],
-     lazyInput :: String,
-     stateCodeStack :: [Int]
+     lazyInput :: String
 }
 
 alexInitUserState :: AlexUserState
 alexInitUserState = AlexUserState {
                         lexerIndentDepth = [0],
-                        lazyInput = [],
-                        stateCodeStack = [0]
+                        lazyInput = []
                     }
 
 alexEOF = return [EndMarker]
@@ -197,9 +195,22 @@ scanner :: String -> Either String [Token]
 scanner str = runAlex str $ do
   let loop toks = do tok <- alexMonadScan
                      case tok of
-                          [EndMarker] -> return (reverse (EndMarker:toks))
+                          [EndMarker] -> return $ lineJoin (reverse (EndMarker:toks))
                           _ -> let foo = loop (tok ++ toks) in foo
   loop []
+
+lineJoin :: [Token] -> [Token]
+lineJoin tokens =
+    let inner accum tok = case tok of
+                          Punct "(" -> (tok : accum, tok)
+                          Punct "[" -> (tok : accum, tok)
+                          Punct "{" -> (tok : accum, tok)
+                          Punct ")" -> (tail accum, tok)
+                          Punct "]" -> (tail accum, tok)
+                          Punct "}" -> (tail accum, tok)
+                          Newline -> if null accum then (accum, tok) else (accum, NoOp)
+                          _ -> (accum, tok)
+        (_, joined) = mapAccumL inner [] tokens in filter (\tok -> tok /= NoOp) joined
 
 main = do
      s <- getContents
