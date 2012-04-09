@@ -80,19 +80,19 @@ tokens :-
        <0>                              \'                                                      { begin shortString' }
        <0>                              \"\"\"                                                  { begin longString }
        <0>                              \'\'\'                                                  { begin longString' }
-       <0>                              @identifier                                             { identifier }
        <0>                              @keyword                                                { keyword }
+       <0>                              @identifier                                             { identifier }
        <0>                              @punctuation                                            { punct }
        <0>                              @linecontinuation                                       { skip }
        <0>                              ^$white*\n                                              { skip }
        <0>                              ^$white*\#.*\n                                          { skip }
-       <0>                              @integerliteral                                         { literal }
-       <0>                              @imagliteral                                            { literal }
-       <0>                              @floatliteral                                           { literal }
-       <0>                              @longinteger                                            { literal }
-       <shortString>                    \"                                                      { endStringLit 0 (\s -> subRegex (mkRegex "\\\\\"") s "\"") }
+       <0>                              @decimalinteger                                         { intLiteral }
+       <0>                              @imagliteral                                            { stringLiteral }
+       <0>                              @floatliteral                                           { stringLiteral }
+       <0>                              @longinteger                                            { stringLiteral }
+       <shortString>                    \"                                                      { endStringLit 0 id }
        <shortString>                    @shortstringitemdouble                                  { stringLit }
-       <shortString'>                   \'                                                      { endStringLit 0 (\s -> subRegex (mkRegex "\\\\'") s "'") }
+       <shortString'>                   \'                                                      { endStringLit 0 id }
        <shortString'>                   @shortstringitemsingle                                  { stringLit }
        <shortString,shortString'>       \\\n                                                    { skip }
        <longString,longString'>         \\\n                                                    { skip }
@@ -111,17 +111,19 @@ data Token =
      | Dedent
      | Newline
      | EndMarker
-     | Punct Char
+     | Punct String
      | Id String
-     | Lit String
+     | StringLit String
+     | IntLit Integer
      | Keyword String
 
 showToken :: Token -> String
 showToken EndMarker = "(ENDMARKER)"
-showToken (Punct c) = "(PUNCT \"" ++ [c] ++ "\")"
+showToken (Punct str) = "(PUNCT \"" ++ str ++ "\")"
 showToken (Id str) = "(ID \"" ++ str ++ "\")"
-showToken (Lit str) = "(LIT \"" ++ str ++ "\")"
-showToken (Keyword str) = "(KEYWORD \"" ++ str ++ "\")"
+showToken (StringLit str) = "(LIT \"" ++ str ++ "\")"
+showToken (IntLit int) = "(LIT " ++ (show int) ++ ")"
+showToken (Keyword str) = "(KEYWORD " ++ str ++ ")"
 showToken Indent = "(INDENT)"
 showToken Dedent = "(DEDENT)"
 showToken Newline = "(NEWLINE)"
@@ -153,14 +155,16 @@ newline (_,_,_) _ = return $ [Newline]
 
 
 
-literal (_,_,input) len = return $ [Lit (take len input)]
+stringLiteral (_,_,input) len = return $ [StringLit (take len input)]
+
+intLiteral (_,_,input) len = return $ [IntLit (read (take len input))]
 
 identifier (_,_,input) len = return [Id (take len input)]
 
 keyword :: (AlexPosn, Char, String) -> Int -> Alex [Token]
 keyword (_,_,input) len = return [Keyword (take len input)]
 
-punct (_,_,input) _ = return [Punct (head input)]
+punct (_,_,input) len = return [Punct (take len input)]
 
 stringLit :: (AlexPosn, Char, String) -> Int -> Alex [Token]
 stringLit (_,_,input) len = do
@@ -172,12 +176,7 @@ endStringLit code transform (_,_,input) len = do
              ust@AlexUserState{lazyInput=accum} <- alexGetUserState
              alexSetUserState ust{lazyInput=""}
              alexSetStartCode code
-             return [Lit (transform accum)]
-
-
-bytesShortLit (_,_,input) len = return $ [Lit $ drop 2 $ init (take len input)]
-bytesLongLit (_,_,input) len = return $ [Lit $ drop 4 $ reverse $ drop 3 $ reverse (take len input)]
-imagLit (_,_,input) len = return $ [Lit (take len input)]
+             return [StringLit (transform accum)]
 
 data AlexUserState = AlexUserState {
      lexerIndentDepth :: [Int],
@@ -198,7 +197,7 @@ scanner :: String -> Either String [Token]
 scanner str = runAlex str $ do
   let loop toks = do tok <- alexMonadScan
                      case tok of
-                          [EndMarker] -> return (reverse toks)
+                          [EndMarker] -> return (reverse (EndMarker:toks))
                           _ -> let foo = loop (tok ++ toks) in foo
   loop []
 
