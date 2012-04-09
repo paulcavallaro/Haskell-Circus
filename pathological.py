@@ -23,18 +23,3 @@ s = "foo\
 
 
 fact(20)
-
-dictionary = {'one': fact(1),
-              'two': fact(2),
-              'three': fact(2)
-              }
-
-list = [
-  'one',
-  1,
-  1.0
-  ]
-
-multilinecall = fact(1 +
-                     2 +
-                     3)
