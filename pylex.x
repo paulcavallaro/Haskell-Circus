@@ -75,31 +75,46 @@ $bindigit = [0 1]
 
 $spacetab = [\t \ ]
 
+-- 0 start code is a logical line
+-- inner start code is within punctuation
+
 tokens :-
 
                                         @linecontinuation                                       { skip }
-       <0>                              \"                                                      { begin shortString }
-       <0>                              \'                                                      { begin shortString' }
-       <0>                              \"\"\"                                                  { begin longString }
-       <0>                              \'\'\'                                                  { begin longString' }
-       <0>                              @keyword                                                { keyword }
-       <0>                              @identifier                                             { identifier }
-       <0>                              @punctuation                                            { punct }
-       <0>                              ^$white*\n                                              { skip }
-       <0>                              ^$white*\#.*\n                                          { skip }
-       <0>                              @decimalinteger                                         { intLiteral }
-       <0>                              @imagliteral                                            { imagLiteral }
-       <0>                              @floatliteral                                           { stringLiteral }
-       <0>                              @longinteger                                            { stringLiteral }
-       <shortString>                    \"                                                      { endStringLit 0 id }
+       <0>                              \"                                                      { startLine $ begin shortString }
+       <line>                           \"                                                      { begin shortString }
+       <0>                              \'                                                      { startLine $ begin shortString' }
+       <line>                           \'                                                      { begin shortString' }
+       <0>                              \"\"\"                                                  { startLine $ begin longString }
+       <line>                           \"\"\"                                                  { begin longString }
+       <0>                              \'\'\'                                                  { startLine $ begin longString' }
+       <line>                           \'\'\'                                                  { begin longString' }
+       <0>                              @keyword                                                { startLine keyword }
+       <line>                           @keyword                                                { keyword }
+       <0>                              @identifier                                             { startLine identifier }
+       <line>                           @identifier                                             { identifier }
+       <0>                              @punctuation                                            { startLine punct }
+       <line>                           @punctuation                                            { punct }
+       <0>                              @decimalinteger                                         { startLine intLiteral }
+       <line>                           @decimalinteger                                         { intLiteral }
+       <0>                              @imagliteral                                            { startLine imagLiteral }
+       <line>                           @imagliteral                                            { imagLiteral }
+       <0>                              @floatliteral                                           { startLine stringLiteral }
+       <line>                           @floatliteral                                           { stringLiteral }
+       <0>                              @longinteger                                            { startLine stringLiteral }
+       <line>                           @longinteger                                            { stringLiteral }
+       <shortString>                    \"                                                      { endStringLit line id }
        <shortString>                    @shortstringitemdouble                                  { stringLit }
-       <shortString'>                   \'                                                      { endStringLit 0 id }
+       <shortString'>                   \'                                                      { endStringLit line id }
        <shortString'>                   @shortstringitemsingle                                  { stringLit }
        <longString,longString'>         @longstringitem                                         { stringLit }
-       <longString>                     \"\"\"                                                  { endStringLit 0 id }
-       <longString'>                    \'\'\'                                                  { endStringLit 0 id }
-       <0>                              \n                                                      { newline }
-       <0>                              .                                                       { skip }
+       <longString>                     \"\"\"                                                  { endStringLit line id }
+       <longString'>                    \'\'\'                                                  { endStringLit line id }
+       <0,line>                         \#.*                                                    { skip }
+       <line>                           \n                                                      { newline }
+       <0>                              \n                                                      { clearCurrentIndent }
+       <0>                              ^$spacetab+                                             { indent }
+       <0,line>                         $white                                                  { skip }
 
 {
 
@@ -140,10 +155,22 @@ alexSetUserState :: AlexUserState -> Alex ()
 alexSetUserState ust = Alex $ \s -> Right (s{alex_ust=ust}, ())
 
 indent (_,_,input) len = do
-       ust@AlexUserState{lexerIndentDepth=indentStack} <- alexGetUserState
-       let (newStack, tokens) = popIndentStack (len - 1) indentStack []
-       alexSetUserState ust{lexerIndentDepth=newStack}
-       return (Newline : tokens)
+    ust <- alexGetUserState
+    alexSetUserState ust{currentIndent=len}
+    return []
+
+clearCurrentIndent _ _ = do
+    ust <- alexGetUserState
+    alexSetUserState ust{currentIndent=0}
+    return []
+
+startLine action ain@(_,_,input) len = do
+    alexSetStartCode line
+    ust@AlexUserState{indentDepth=indentStack,currentIndent=indent} <- alexGetUserState
+    let (newStack, tokens) = popIndentStack indent indentStack []
+    alexSetUserState ust{indentDepth=newStack}
+    foo <- action ain len
+    return (foo ++ tokens)
 
 popIndentStack :: Int -> [Int] -> [Token] -> ([Int], [Token])
 popIndentStack len indentStack accum =
@@ -153,7 +180,10 @@ popIndentStack len indentStack accum =
                then popIndentStack len (tail indentStack) (Dedent : accum)
                else ((len : indentStack), (Indent : accum))
 
-newline (_,_,_) _ = return $ [Newline]
+newline (a,b,input) len = do
+    ust@AlexUserState{punctStack=pStack} <- alexGetUserState
+    alexSetUserState ust{currentIndent=0}
+    if null pStack then do alexSetStartCode 0; return [Newline] else return []
 
 stringLiteral (_,_,input) len = return $ [StringLit (take len input)]
 
@@ -166,7 +196,30 @@ identifier (_,_,input) len = return [Id (take len input)]
 keyword :: (AlexPosn, Char, String) -> Int -> Alex [Token]
 keyword (_,_,input) len = return [Keyword (take len input)]
 
-punct (_,_,input) len = return [Punct (take len input)]
+punct :: (AlexPosn, Char, String) -> Int -> Alex [Token]
+punct (_,_,input) len =
+    let str = (take len input) in
+      case str of
+        "(" -> openPunct $ Punct str
+        "[" -> openPunct $ Punct str
+        "{" -> openPunct $ Punct str
+        ")" -> do closePunct ; return [Punct str]
+        "]" -> do closePunct ; return [Punct str]
+        "}" -> do closePunct ; return [Punct str]
+        _ -> return [Punct str]
+
+openPunct :: Token -> Alex [Token]
+openPunct punct = do
+    ust@AlexUserState{punctStack=pStack} <- alexGetUserState
+    alexSetUserState ust{punctStack=(punct : pStack)}
+    return [punct]
+
+
+closePunct :: Alex ()
+closePunct = do
+    ust@AlexUserState{punctStack=pStack} <- alexGetUserState
+    alexSetUserState ust{punctStack=(tail pStack)}
+
 
 stringLit :: (AlexPosn, Char, String) -> Int -> Alex [Token]
 stringLit (_,_,input) len = do
@@ -181,13 +234,17 @@ endStringLit code transform (_,_,input) len = do
              return [StringLit (transform accum)]
 
 data AlexUserState = AlexUserState {
-     lexerIndentDepth :: [Int],
+     indentDepth :: [Int],
+     punctStack :: [Token],
+     currentIndent :: Int,
      lazyInput :: String
 }
 
 alexInitUserState :: AlexUserState
 alexInitUserState = AlexUserState {
-                        lexerIndentDepth = [0],
+                        indentDepth = [0],
+                        currentIndent = 0,
+                        punctStack = [],
                         lazyInput = []
                     }
 
