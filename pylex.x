@@ -115,7 +115,18 @@ data Token =
      | Id String
      | Lit String
      | Keyword String
-     deriving (Eq,Show)
+
+showToken :: Token -> String
+showToken EndMarker = "(ENDMARKER)"
+showToken (Punct c) = "(PUNCT \"" ++ [c] ++ "\")"
+showToken (Id str) = "(ID \"" ++ str ++ "\")"
+showToken (Lit str) = "(LIT \"" ++ str ++ "\")"
+showToken (Keyword str) = "(KEYWORD \"" ++ str ++ "\")"
+showToken Indent = "(INDENT)"
+showToken Dedent = "(DEDENT)"
+showToken Newline = "(NEWLINE)"
+
+instance Show Token where show = showToken
 
 alexGetUserState :: Alex AlexUserState
 alexGetUserState = Alex $ \s@AlexState{alex_ust=ust} -> Right (s, ust)
@@ -191,19 +202,9 @@ scanner str = runAlex str $ do
                           _ -> let foo = loop (tok ++ toks) in foo
   loop []
 
-printToken :: Token -> IO ()
-printToken token = do
-     case token of
-          Newline -> putStrLn ""
-          Punct c -> putStr $ c : " "
-          Id s -> putStr (s ++ " ")
-          Keyword s -> putStr (s ++ " ")
-          Lit s -> putStr (s ++ " ")
-          _ -> putStr $ (show token) ++ " "
-
 main = do
      s <- getContents
      case (scanner s) of
           Left message -> print message
-          Right tokens -> print tokens
+          Right tokens -> mapM_ print tokens
 }
