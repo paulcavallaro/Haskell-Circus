@@ -76,7 +76,7 @@ $bindigit = [0 1]
 $spacetab = [\t \ ]
 
 -- 0 start code is a logical line
--- inner start code is within punctuation
+-- line start code is within a logical line
 
 tokens :-
 
