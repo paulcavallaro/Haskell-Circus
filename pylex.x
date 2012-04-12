@@ -15,13 +15,7 @@ $shortstringchardouble = [^ \\ \n \"]
 @longstringitem = ($longstringchar | @stringescapeseq)
 @shortstringitemsingle = ($shortstringcharsingle | @stringescapeseq)
 @shortstringitemdouble = ($shortstringchardouble | @stringescapeseq)
-@shortstring = (' @shortstringitemsingle* ' | \" @shortstringitemdouble* \")
-@longstring = (\'\'\' @longstringitem* \'\'\' | \"\"\" @longstringitem* \"\"\")
-$stringprefix = [rR]
-@rawlongstringliteral = $stringprefix @longstring
-@longstringliteral = @longstring
-@rawshortstringliteral = $stringprefix @shortstring
-@shortstringliteral = @shortstring
+$rawprefix = [rR]
 
 $shortbyteschardouble = [^ \\ \n \" ]
 $shortbytescharsingle = [^ \\ \n \' ]
@@ -83,6 +77,10 @@ tokens :-
                                         @linecontinuation                                       { skip }
        <0>                              \"                                                      { startLine $ begin shortString }
        <line>                           \"                                                      { begin shortString }
+       <0>                              [rR]\'                                                  { startLine $ begin shortString' }
+       <line>                           [rR]\'                                                  { begin shortString' }
+       <0>                              [rR]\"                                                  { startLine $ begin shortString }
+       <line>                           [rR]\"                                                  { begin shortString }
        <0>                              \'                                                      { startLine $ begin shortString' }
        <line>                           \'                                                      { begin shortString' }
        <0>                              \"\"\"                                                  { startLine $ begin longString }
