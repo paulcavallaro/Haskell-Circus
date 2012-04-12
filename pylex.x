@@ -81,6 +81,10 @@ tokens :-
        <line>                           [rR]\'                                                  { begin shortString' }
        <0>                              [rR]\"                                                  { startLine $ begin shortString }
        <line>                           [rR]\"                                                  { begin shortString }
+       <0>                              [uU]\'                                                  { startLine $ begin shortString' }
+       <line>                           [uU]\'                                                  { begin shortString' }
+       <0>                              [uU]\"                                                  { startLine $ begin shortString }
+       <line>                           [uU]\"                                                  { begin shortString }
        <0>                              \'                                                      { startLine $ begin shortString' }
        <line>                           \'                                                      { begin shortString' }
        <0>                              \"\"\"                                                  { startLine $ begin longString }
