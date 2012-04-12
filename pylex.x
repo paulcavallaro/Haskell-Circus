@@ -254,22 +254,9 @@ scanner :: String -> Either String [Token]
 scanner str = runAlex str $ do
   let loop toks = do tok <- alexMonadScan
                      case tok of
-                          [EndMarker] -> return $ lineJoin (reverse (EndMarker:toks))
+                          [EndMarker] -> return $ (reverse (EndMarker:toks))
                           _ -> let foo = loop (tok ++ toks) in foo
   loop []
-
-lineJoin :: [Token] -> [Token]
-lineJoin tokens =
-    let inner accum tok = case tok of
-                          Punct "(" -> (tok : accum, tok)
-                          Punct "[" -> (tok : accum, tok)
-                          Punct "{" -> (tok : accum, tok)
-                          Punct ")" -> (tail accum, tok)
-                          Punct "]" -> (tail accum, tok)
-                          Punct "}" -> (tail accum, tok)
-                          Newline -> if null accum then (accum, tok) else (accum, NoOp)
-                          _ -> (accum, tok)
-        (_, joined) = mapAccumL inner [] tokens in filter (\tok -> tok /= NoOp) joined
 
 main = do
      s <- getContents
