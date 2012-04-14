@@ -32,7 +32,7 @@ parseLit = do
   val <- try parseString <|> try parseInt
   char ')'
   return val
-  
+
 parsePunct :: Parser PyVal
 parsePunct = do
   char '('
@@ -42,6 +42,26 @@ parsePunct = do
   char '"'
   char ')'
   return $ Punct x
+
+parseId :: Parser PyVal
+parseId = do
+  char '('
+  string "ID "
+  char '"'
+  x <- many1 $ noneOf ['"']
+  char '"'
+  char ')'
+  return $ Id x
+
+parseKeyword :: Parser PyVal
+parseKeyword = do
+  char '('
+  string "KEYWORD "
+  char '"'
+  x <- many1 $ noneOf ['"']
+  char '"'
+  char ')'
+  return $ Keyword x
 
 parseString :: Parser PyVal
 parseString = do
@@ -66,6 +86,8 @@ parseEscaped = do
 parseToken :: Parser PyVal
 parseToken = try parseLit
          <|> try parsePunct
+         <|> try parseId
+         <|> try parseKeyword
 
 readToken :: String -> PyVal
 readToken input = case parse parseToken "python" input of
@@ -74,5 +96,5 @@ readToken input = case parse parseToken "python" input of
 
 main :: IO ()
 main = do
-  x <- getContents 
+  x <- getContents
   mapM_ print $ map (readToken . unpack) $ filter (not . null . strip) $ lines x
