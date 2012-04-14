@@ -32,6 +32,16 @@ parseLit = do
   val <- try parseString <|> try parseInt
   char ')'
   return val
+  
+parsePunct :: Parser PyVal
+parsePunct = do
+  char '('
+  string "PUNCT "
+  char '"'
+  x <- many1 $ noneOf ['"']
+  char '"'
+  char ')'
+  return $ Punct x
 
 parseString :: Parser PyVal
 parseString = do
@@ -55,6 +65,7 @@ parseEscaped = do
 
 parseToken :: Parser PyVal
 parseToken = try parseLit
+         <|> try parsePunct
 
 readToken :: String -> PyVal
 readToken input = case parse parseToken "python" input of
