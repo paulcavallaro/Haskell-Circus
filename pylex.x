@@ -2,6 +2,7 @@
 module Main(main) where
 import Text.Regex (subRegex, mkRegex)
 import Data.List (mapAccumL)
+import Data.Complex
 }
 %wrapper "monadUserState"
 
@@ -48,7 +49,8 @@ $bindigit = [0 1]
 @exponentfloat = (@intpart | @pointfloat) @exponent
 @floatliteral = @pointfloat | @exponentfloat
 
-@imagliteral = (@floatliteral | @intpart) (j | J)
+@floatimagliteral = @floatliteral (j | J)
+@intimagliteral = @intpart (j | J)
 
 @keyword = False|None|True|and|as|assert|break|class|continue|def|
            del|elif|else|except|finally|for|from|global|if|import|in|is|lambda|
@@ -99,12 +101,14 @@ tokens :-
        <line>                           @punctuation                                            { punct }
        <0>                              @decimalinteger                                         { startLine intLiteral }
        <line>                           @decimalinteger                                         { intLiteral }
-       <0>                              @imagliteral                                            { startLine imagLiteral }
-       <line>                           @imagliteral                                            { imagLiteral }
-       <0>                              @floatliteral                                           { startLine stringLiteral }
-       <line>                           @floatliteral                                           { stringLiteral }
-       <0>                              @longinteger                                            { startLine stringLiteral }
-       <line>                           @longinteger                                            { stringLiteral }
+       <0>                              @intimagliteral                                         { startLine intImagLiteral }
+       <line>                           @intimagliteral                                         { intImagLiteral }
+       <0>                              @floatimagliteral                                       { startLine floatImagLiteral }
+       <line>                           @floatimagliteral                                       { floatImagLiteral }
+       <0>                              @floatliteral                                           { startLine floatLiteral }
+       <line>                           @floatliteral                                           { floatLiteral }
+       <0>                              @longinteger                                            { startLine longLiteral }
+       <line>                           @longinteger                                            { longLiteral }
        <shortString>                    \"                                                      { endStringLit line id }
        <shortString>                    @shortstringitemdouble                                  { stringLit }
        <shortString'>                   \'                                                      { endStringLit line id }
@@ -130,8 +134,10 @@ data Token =
      | Punct String
      | Id String
      | StringLit String
+     | ImagLit Double
+     | LongLit Integer
+     | FloatLit Double
      | IntLit Integer
-     | ImagLit String
      | Keyword String
      | NoOp
      deriving (Eq)
@@ -141,8 +147,10 @@ showToken EndMarker = "(ENDMARKER)"
 showToken (Punct str) = "(PUNCT \"" ++ str ++ "\")"
 showToken (Id str) = "(ID \"" ++ str ++ "\")"
 showToken (StringLit str) = "(LIT \"" ++ str ++ "\")"
+showToken (FloatLit float) = "(LIT " ++ (show float) ++ ")"
+showToken (LongLit long) = "(LIT " ++ (show long) ++ ")"
 showToken (IntLit int) = "(LIT " ++ (show int) ++ ")"
-showToken (ImagLit str) = "(LIT +" ++ str ++ "i)"
+showToken (ImagLit float) = "(LIT +" ++ (show float) ++ "i)"
 showToken (Keyword str) = "(KEYWORD " ++ str ++ ")"
 showToken Indent = "(INDENT)"
 showToken Dedent = "(DEDENT)"
@@ -187,11 +195,23 @@ newline (a,b,input) len = do
     alexSetUserState ust{currentIndent=0}
     if null pStack then do alexSetStartCode 0; return [Newline] else return []
 
-stringLiteral (_,_,input) len = return $ [StringLit (take len input)]
+longLiteral (_,_,input) len = return $ [LongLit (read (take len input))]
+
+floatLiteral (_,_,input) len = return $ [FloatLit $ readFloatLiteral (take len input)]
+
+readFloatLiteral :: String -> Double
+readFloatLiteral ('.' : rest) = (read $ '0' : '.' : rest)
+readFloatLiteral (start : '.' : 'e' : rest) = (read $ start : '.' : '0' : 'e' : rest)
+readFloatLiteral x
+  | (last x == '.') = (read $ x ++ "0")
+  | otherwise = (read x)
 
 intLiteral (_,_,input) len = return $ [IntLit (read (take len input))]
 
-imagLiteral (_,_,input) len = return $ [ImagLit (take (len -1) input)]
+intImagLiteral (_,_,input) len = return $ [readIntImagLiteral (take (len-1) input)]
+  where readIntImagLiteral x = ImagLit $ read x
+
+floatImagLiteral (_,_,input) len = return $ [ImagLit $ readFloatLiteral (take (len-1) input)]
 
 identifier (_,_,input) len = return [Id (take len input)]
 
