@@ -3,7 +3,7 @@ import System.Environment
 import Control.Monad
 import Prelude hiding (getContents, lines, null)
 import Text.ParserCombinators.Parsec hiding (spaces)
-import Data.Text (split, unpack, lines, strip, null)
+import Data.Text (split, unpack, lines, strip, null, Text)
 import Data.Text.IO (getContents)
 
 data PyVal = Id String
@@ -12,7 +12,8 @@ data PyVal = Id String
            | String String
            | Integer Integer
            | Float Double
-           | Unicode String
+           | Imaginary Double
+           | Unicode Text
            | Newline
            | EOF
            | Indent
@@ -23,7 +24,7 @@ showVal (Id contents) = contents
 showVal (Keyword contents) = contents
 showVal (Punct contents) = contents
 showVal (String contents) = "\"" ++ contents ++ "\""
-showVal (Unicode contents) = "u\"" ++ contents ++ "\""
+showVal (Unicode contents) = "u\"" ++ (show contents) ++ "\""
 showVal (Float num) = show num
 showVal (Integer num) = show num
 showVal Indent = "(INDENT)"

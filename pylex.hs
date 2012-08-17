@@ -277,7 +277,6 @@ data Token =
      | FloatLit Double
      | IntLit Integer
      | Keyword String
-     | NoOp
      deriving (Eq)
 
 showToken :: Token -> String
