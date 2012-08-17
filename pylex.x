@@ -130,7 +130,7 @@ data Token =
        Indent
      | Dedent
      | Newline
-     | EndMarker
+     | EOF
      | Punct String
      | Id String
      | StringLit String
@@ -142,7 +142,7 @@ data Token =
      deriving (Eq)
 
 showToken :: Token -> String
-showToken EndMarker = "(ENDMARKER)"
+showToken EOF = "(ENDMARKER)"
 showToken (Punct str) = "(PUNCT \"" ++ str ++ "\")"
 showToken (Id str) = "(ID \"" ++ str ++ "\")"
 showToken (StringLit str) = "(LIT \"" ++ str ++ "\")"
@@ -269,13 +269,13 @@ alexInitUserState = AlexUserState {
                         lazyInput = []
                     }
 
-alexEOF = return [EndMarker]
+alexEOF = return [EOF]
 
 scanner :: String -> Either String [Token]
 scanner str = runAlex str $ do
   let loop toks = do tok <- alexMonadScan
                      case tok of
-                          [EndMarker] -> return $ (reverse (EndMarker:toks))
+                          [EOF] -> return $ (reverse (EOF:toks))
                           _ -> let foo = loop (tok ++ toks) in foo
   loop []
 

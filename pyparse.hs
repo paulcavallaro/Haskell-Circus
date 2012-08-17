@@ -25,6 +25,7 @@ showVal (Keyword contents) = contents
 showVal (Punct contents) = contents
 showVal (String contents) = "\"" ++ contents ++ "\""
 showVal (Unicode contents) = "u\"" ++ (show contents) ++ "\""
+showVal (Imaginary num) = show num
 showVal (Float num) = show num
 showVal (Integer num) = show num
 showVal Indent = "(INDENT)"
