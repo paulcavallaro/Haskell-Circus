@@ -142,18 +142,17 @@ data Token =
      deriving (Eq)
 
 showToken :: Token -> String
-showToken EOF = "(ENDMARKER)"
-showToken (Punct str) = "(PUNCT \"" ++ str ++ "\")"
-showToken (Id str) = "(ID \"" ++ str ++ "\")"
-showToken (StringLit str) = "(LIT \"" ++ str ++ "\")"
-showToken (FloatLit float) = "(LIT " ++ (show float) ++ ")"
-showToken (LongLit long) = "(LIT " ++ (show long) ++ ")"
-showToken (IntLit int) = "(LIT " ++ (show int) ++ ")"
-showToken (ImagLit float) = "(LIT +" ++ (show float) ++ "i)"
-showToken (Keyword str) = "(KEYWORD " ++ str ++ ")"
+showToken (Id contents) = contents
+showToken (Keyword contents) = contents
+showToken (Punct contents) = contents
+showToken (StringLit contents) = show contents
+showToken (ImagLit num) = (show num) ++ "j"
+showToken (FloatLit num) = show num
+showToken (IntLit num) = show num
 showToken Indent = "(INDENT)"
-showToken Dedent = "(DEDENT)"
 showToken Newline = "(NEWLINE)"
+showToken Dedent = "(DEDENT)"
+showToken EOF = "(ENDMARKER)"
 
 instance Show Token where show = showToken
 
@@ -279,9 +278,21 @@ scanner str = runAlex str $ do
                           _ -> let foo = loop (tok ++ toks) in foo
   loop []
 
+prettyPrint :: [Token] -> String -> Int -> String
+prettyPrint vals accum iLevel =
+  case (head vals) of
+    EOF -> accum
+    Indent -> prettyPrint (tail vals) (accum ++ "\t") (iLevel + 1)
+    Dedent -> prettyPrint (tail vals) (init accum) (iLevel - 1)
+    Newline -> prettyPrint (tail vals) (accum ++ "\n" ++ (take iLevel (repeat '\t'))) iLevel
+    (Keyword kw) -> prettyPrint (tail vals) (accum ++ kw ++ " ") iLevel
+    _ -> prettyPrint (tail vals) (accum ++ (show (head vals))) iLevel
+
+main :: IO ()
 main = do
-     s <- getContents
-     case (scanner s) of
-          Left message -> print message
-          Right tokens -> mapM_ print tokens
+  s <- getContents
+  case (scanner s) of
+    Left message -> print message
+    Right tokens -> putStrLn $ prettyPrint tokens "" 0
+
 }
