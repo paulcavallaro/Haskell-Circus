@@ -21,5 +21,6 @@ def fact(  x\
 s = "foo\
 \\ \n\'\""
 
-
-fact(20)
+print(
+  fact(20)
+)

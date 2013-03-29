@@ -23,9 +23,9 @@ showVal :: PyVal -> String
 showVal (Id contents) = contents
 showVal (Keyword contents) = contents
 showVal (Punct contents) = contents
-showVal (String contents) = "\"" ++ contents ++ "\""
+showVal (String contents) = show contents
 showVal (Unicode contents) = "u\"" ++ (show contents) ++ "\""
-showVal (Imaginary num) = show num
+showVal (Imaginary num) = (show num) ++ "j"
 showVal (Float num) = show num
 showVal (Integer num) = show num
 showVal Indent = "(INDENT)"
@@ -48,7 +48,7 @@ parseEOF = do string "ENDMARKER"; return EOF
 parseLit :: Parser PyVal
 parseLit = do
   string "LIT "
-  val <- try parseString <|> try parseInt
+  val <- try parseString <|> try parseInt <|> try parseImaginary
   return val
 
 parsePunct :: Parser PyVal
@@ -83,6 +83,9 @@ parseString = do
 parseInt :: Parser PyVal
 parseInt = liftM (Integer . read) $ many1 digit
 
+parseImaginary :: Parser PyVal
+parseImaginary = liftM (Imaginary . read . tail . init) $ many1 (oneOf "+i.0123456789")
+
 parseEscaped = do
   char '\\'
   c <- anyChar
@@ -92,6 +95,7 @@ parseEscaped = do
     'r' -> return '\r'
     't' -> return '\t'
     '"' -> return '"'
+    x -> return x
 
 parseToken :: Parser PyVal
 parseToken = do
@@ -106,7 +110,7 @@ parseToken = do
 
 readToken :: String -> PyVal
 readToken input = case parse parseToken "python" input of
-  Left err -> String $ "No match: " ++ show err
+  Left err -> String $ "No match: " ++ show err ++ ", input: " ++ input
   Right val -> val
 
 prettyPrintVals :: [PyVal] -> String -> Int -> String
